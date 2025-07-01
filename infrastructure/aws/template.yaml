@@ -1,0 +1,108 @@
+# AWS CloudFormation template for StudentSpendSmart
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template for StudentSpendSmart backend and infrastructure.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: 'dev'
+    Description: Name of the deployment environment (e.g., dev, staging, prod).
+
+Resources:
+  # VPC and networking resources (example)
+  VPCCidrBlock: "10.0.0.0/16"
+
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCidrBlock
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-StudentSpendSmart-VPC"
+
+  Subnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.1.0/24"
+      AvailabilityZone: !Select [0, !GetAZs !Ref VPC]
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-StudentSpendSmart-Subnet-1"
+
+  Subnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.2.0/24"
+      AvailabilityZone: !Select [1, !GetAZs !Ref VPC]
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-StudentSpendSmart-Subnet-2"
+
+  # RDS Database Instance (PostgreSQL)
+  RDSInstance: # Placeholder, actual configuration needed
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceClass: "db.t3.micro"
+      AllocatedStorage: "20"
+      Engine: "postgres"
+      EngineVersion: "13.7"
+      MasterUsername: "admin"
+      MasterUserPassword: "yourSecurePassword" # Use Secrets Manager in production!
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups: [!Ref DBSecurityGroup]
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-StudentSpendSmart-RDS"
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Subnet group for RDS instances"
+      SubnetIds:
+        - !Ref Subnet1
+        - !Ref Subnet2
+
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Allow inbound traffic to RDS"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: "0.0.0.0/0" # Restrict in production!
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-StudentSpendSmart-DBSG"
+
+  # S3 Bucket for static assets (e.g., user avatars, images)
+  S3Bucket: 
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "student-spend-smart-${EnvironmentName}-assets"
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-StudentSpendSmart-S3"
+
+Outputs:
+  VPCId:
+    Description: "The ID of the VPC"
+    Value: !Ref VPC
+  RDSInstanceEndpoint:
+    Description: "The endpoint of the RDS instance"
+    Value: !GetAtt RDSInstance.Endpoint.Address
+  S3BucketName:
+    Description: "Name of the S3 bucket for assets"
+    Value: !Ref S3Bucket
